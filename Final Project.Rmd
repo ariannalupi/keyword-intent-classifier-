@@ -1,0 +1,369 @@
+---
+title: "Final Project"
+output: html_notebook
+---
+```{r}
+#Installing the packages 
+install.packages("stringr")
+install.packages("caTools")
+install.packages("gmodels")
+install.packages("corrplot")
+install.packages("Metrics")
+install.packages("olsrr")
+```
+
+# Document Preparation
+# Load libraries
+```{r}
+# Libraries
+library(stringr)
+library(tidyverse)
+library(lubridate)
+library(caTools)
+library(class)
+library(gmodels)
+library(corrplot)
+library(Metrics)
+library(olsrr)
+```
+#Data Source: Google Data Studio
+
+#This data is a csv exported from an seo agency's Google Organic Search data. There's 1,000 rows of information on specific keywords, categories, clicks, impressions, click through rates, and conversions. 
+
+#The problem: Can we  predict the click through rate from a user on a given keyword or keyword intent?
+
+#Intent for the purpose of this research will be classified in "Low" "Mid" and "High"
+
+```{r}
+agency <- read.csv("agency.csv", stringsAsFactors = T)
+
+str(agency)
+```
+#Exploring the data
+
+```{r}
+summary(agency)
+head(agency)
+view(agency)
+```
+##We can see this data set has the following columns: 
+#Keywords: the keywords or keyphrases users found to get to the agency's website.
+#Category: the category of the topic of the keyword, if it's either about SEO, SaaS, Marketing, Link Building, if it's a Landing Page or other if it falls in another category. 
+#Clicks: clicks made to the page form the given keyword.
+#Impressions: impressions to the page from a given keyword. 
+#CTR: % of users that clicked through the page after an impression.
+#Position: the position of the page for a given keyword in Google's result page. 
+#Conversions: number of conversions for a given keyword. 
+
+
+# Data Transformation 
+
+```{r}
+# Adding a new column IF there's phrases within specific keywords using STR detect
+
+#Using str I'm splitting the data in 3 different data sets filtering by the words that are associated to each intent
+
+#In this case, according to the industry's standard the keywords best|agency|tools|consultant|consultancy are associated to High intent. 
+
+#High Intent 
+highintentstr <- agency %>% filter(str_detect(Keyword,("best|agency|tools|consultant|consultancy")))   
+highintentstr
+highintent <- highintentstr %>% mutate(intent = "High")
+highintent
+
+#Mid Intent 
+midintentstr <- agency %>% filter(str_detect(Keyword,("how|what|who|when|where|why|which")))
+midintent <- midintentstr %>% mutate(intent = "Mid")
+midintent
+
+#All the other intents are considered low 
+lowintentstr <- agency %>% filter(!str_detect(Keyword,("best|agency|tools|consultant|consultancy|how|what|who|when|where|why|which")))
+lowintent <- lowintentstr %>% mutate(intent = "Low")
+lowintent
+
+#Rbind all of them together
+AgencyIntents<- rbind(highintent, midintent, lowintent)
+View(AgencyIntents)
+```
+
+#We now created a new column with the intents for all keywords from industry standards. I did not use ifelse here because I couldn't find a way to include some phrases, so I did str and rbind instead. 
+
+#Visualization 
+
+```{r}
+#Position and CTR for each Intent
+ggplot(data = AgencyIntents, mapping = aes(x = Position, y = CTR, color = intent)) + geom_smooth()
+```
+
+```{r}
+#Position and Clicks for each Intent
+ggplot(data = AgencyIntents, mapping = aes(x = Position, y = Clicks, color = intent)) + geom_smooth()
+```
+```{r}
+#Position and Clicks for each Category
+ggplot(data = AgencyIntents, mapping = aes(x = Position, y = Clicks, color = Category)) + geom_point()
+```
+
+```{r}
+#Position and Clicks for each Intent
+ggplot(data = AgencyIntents, mapping = aes(x = Position, y = Clicks, color = intent)) + geom_point(aes(color = intent),size = 3,alpha = 0.8)
+```
+```{r}
+#CTR and Clicks for each Intent
+ggplot(data = AgencyIntents, mapping = aes(x = CTR, y = Clicks, color = intent)) + geom_point(aes(color = intent, size = 1))
+```
+
+```{r}
+#CTR and Position for each Intent
+ggplot(data = AgencyIntents, mapping = aes(x = CTR, y = Position)) + geom_point(aes(color = Category, size = .5))
+```
+
+```{r}
+#Count per each Category
+ggplot(AgencyIntents, aes(Category)) + geom_bar(aes(fill=Category))
+
+#We can see here, the Category with the most keywords is Marketing 
+```
+```{r}
+#Count for each Intent
+ggplot(AgencyIntents, aes(intent)) + geom_bar(aes(fill=intent))
+
+#The intent with the most keywords is "Low"
+```
+```{r}
+
+```{r}
+#Conversions per Intent 
+ggplot(AgencyIntents, aes(x=intent, y=Conversions)) + 
+  geom_bar(stat="identity", width=.5, fill = "blue") + 
+  theme(axis.text.x = element_text(angle=65, vjust=0.6))
+
+#The sum of all low intent keywords have the most conversions
+```
+```{r}
+#CTR per Intent 
+ggplot(AgencyIntents, aes(x=intent, y=CTR)) + 
+  geom_bar(stat="identity", width=.5, fill = "green") + 
+  theme(axis.text.x = element_text(angle=65, vjust=0.6))
+
+#The sum of all low intent keywords have the biggest CTR
+```
+```{r}
+ # Histogram on a Categorical variable
+ggplot(AgencyIntents, aes(Category)) + geom_bar(aes(fill=intent), width = 0.5) + 
+  theme(axis.text.x = element_text(angle=65, vjust=0.6)) + 
+  labs(title="Histogram on Keyword Category", 
+       subtitle="Intent per Keyword Category") 
+
+#The keyword category with the higher intent is SEO
+```
+
+```{r}
+ggplot(AgencyIntents, aes(Position))+ geom_density(aes(fill=factor(Category)), alpha=1) + 
+    labs(title="Density plot", 
+         caption="Source: agency",
+         x="Position",
+         fill="#Category")
+
+#We can see here most Marketing keywords rank between 0-20
+#SEO Keywords Rank from 0 to 120
+
+```
+
+```{r}
+ggplot(AgencyIntents, aes(x = "", y=Conversions, fill = factor(Category))) + 
+  geom_bar(width = 1, stat = "identity") +
+  theme(axis.line = element_blank(), 
+        plot.title = element_text(hjust=0.5)) + coord_polar(theta = "y", start=0)
+
+#We can see the Marketing category is taking most of the visualizations
+```
+
+       
+```{r}
+#Sample Split
+
+set.seed(123)
+
+AgencyIntents$sample <- sample.split(AgencyIntents$intent, SplitRatio = 0.60)
+
+train <- subset(AgencyIntents, sample == TRUE)
+
+test <- subset(AgencyIntents, sample == FALSE)
+
+str(AgencyIntents)
+```
+#Removing Non-Numeric elements
+
+```{r}
+view(AgencyIntents)
+AgencyNumeric <- select(AgencyIntents,Clicks, Impressions, CTR, Position,Conversions )
+
+droplevels(AgencyNumeric)
+```
+
+
+#Correlation Check
+
+```{r}
+AgencyCor<- cor(AgencyNumeric)
+corrplot(AgencyCor, method = "number")
+```
+#Non Numeric Visualizations 
+```{r}
+#Impressions vs CTR
+ggplot(data = AgencyNumeric, mapping = aes(x = CTR, y = Impressions, color = Clicks)) + geom_line()
+```
+
+```{r}
+#CTR vs Position 
+ggplot(data = AgencyNumeric, mapping = aes(x = Position, y = CTR)) + geom_line()
+```
+#First Model: Linear Regression and Stepwise
+
+#Linear Regression
+```{r}
+AgencyModel <-  lm(CTR ~ Clicks + Impressions + Position + Conversions , data = AgencyNumeric)
+
+AgencyPrediction <- predict(AgencyModel, test)
+
+cat("Linear Regression RMSE:", rmse(AgencyPrediction, test$CTR), "\n")
+```
+
+#Stepwise
+```{r}
+#Forward
+StepwiseForward <- ols_step_forward_p(AgencyModel, details = TRUE)
+StepwiseForwardModelPrediction <- predict(StepwiseForward$model, test)
+cat("Stepwise Forward RMSE:", rmse(StepwiseBackwardModelPrediction, test$CTR))
+
+#Backward
+StepwiseBackward <- ols_step_backward_p(AgencyModel, details = TRUE)
+StepwiseBackwardModelPrediction <- predict(StepwiseBackward$model, test)
+cat("Stepwise Backward RMSE:", rmse(StepwiseBackwardModelPrediction, test$CTR))
+
+#Both 
+StepwiseBoth <- ols_step_both_p(AgencyModel, details = TRUE)
+StepwiseBothModelPrediction <- predict(StepwiseBoth$model, test)
+
+cat("Stepwise Both RMSE:", rmse(StepwiseBothModelPrediction, test$CTR), "\n")
+
+```
+## In this case, all errors are the same.  
+#Linear Regression RMSE: 6.311982 
+#Stepwise Backward RMSE: 6.311982
+#Stepwise Forward RMSE: 6.311982
+#Stepwise Both RMSE: 6.311982 
+
+# Second Model: KNN
+#From the variables chosen by the on the regression method, I will create a K Nearest Neighbors model using the variables with the highest correlation and display the accurracy
+
+#Although from part one, all Stepwise models output the same RMSE, I am using Stepwise Forward as it contains the least amount of variables.
+
+#Stepwise Forward
+
+#Variables Selected:CTR ~ Clicks + Impressions + Position + Conversions 
+#From the Corelation Check, I'm choosing Clicks and Conversions since they are highly and positively correlated
+
+```{r}
+
+#CLicks and Conversions 
+AgencyTrain <- select(train, Clicks, Conversions)
+
+AgencyTest <- select(test, Clicks, Conversions)
+
+PredictedClass <- knn(train = AgencyTrain, test = AgencyTest,cl = train$intent, k = 3)
+
+AgencyConfusion <- table(PredictedClass, test$intent)
+
+AccurracyAgency <- sum(diag(AgencyConfusion)) / sum(AgencyConfusion)
+
+
+cat("Accurracy KNN:", AccurracyAgency)
+```
+```{r}
+#Plotting Clicks and Conversions
+```
+
+```{r}
+ggplot(data = AgencyIntents, mapping = aes (x = Clicks, y = Conversions, color = intent))+ geom_point()
+```
+
+```{r}
+ggplot(data = AgencyIntents, mapping = aes (x = Clicks, y = Conversions, color = intent))+ geom_point() 
+```
+
+
+
+```{r}
+#Position  and CTR 
+AgencyTrain2 <- select(train, CTR, Position)
+
+AgencyTest2 <- select(test, CTR, Position)
+
+PredictedClass2 <- knn(train = AgencyTrain2, test = AgencyTest2,cl = train$intent, k = 3)
+
+AgencyConfusion2 <- table(PredictedClass2, test$intent)
+
+AccurracyAgency2 <- sum(diag(AgencyConfusion2)) / sum(AgencyConfusion2)
+
+
+cat("Accurracy KNN:", AccurracyAgency2)
+```
+
+```{r}
+ggplot(data = AgencyIntents, mapping = aes (x = CTR, y = Position, color = intent))+ geom_point() 
+```
+
+```{r}
+#Conversions and Position 
+AgencyTrain3 <- select(train, Conversions, Position)
+
+AgencyTest3 <- select(test, Conversions, Position)
+
+PredictedClass3 <- knn(train = AgencyTrain3, test = AgencyTest3,cl = train$intent, k = 3)
+
+AgencyConfusion3 <- table(PredictedClass3, test$intent)
+
+AccurracyAgency3 <- sum(diag(AgencyConfusion3)) / sum(AgencyConfusion3)
+
+
+cat("Accurracy KNN:", AccurracyAgency3)
+```
+
+```{r}
+ggplot(data = AgencyIntents, mapping = aes (x = Conversions, y = Position, color = intent))+ geom_point() 
+```
+
+
+```{r}
+#Impressions and Clicks 
+AgencyTrain4 <- select(train, Impressions, Clicks)
+
+AgencyTest4 <- select(test, Impressions, Clicks)
+
+PredictedClass4 <- knn(train = AgencyTrain4, test = AgencyTest4,cl = train$intent, k = 3)
+
+AgencyConfusion4 <- table(PredictedClass4, test$intent)
+
+AccurracyAgency4 <- sum(diag(AgencyConfusion4)) / sum(AgencyConfusion4)
+
+
+cat("Accurracy KNN:", AccurracyAgency4)
+```
+
+```{r}
+ggplot(data = AgencyIntents, mapping = aes (x = Impressions, y = Clicks, color = intent))+ geom_point() 
+```
+
+
+```{r}
+#Create a new dataframe to store the accuracies of both models. 
+
+df <- data.frame(Variable1 = c("Clicks","Conversions"),
+                 Variable2 = c("Position", "CTR"),
+                 Variable3 = c("Conversions","Position"),
+                 Variable4 = c("Impressions", "Clicks"),
+  accurracy = c(AccurracyAgency, AccurracyAgency2,AccurracyAgency3,AccurracyAgency4))
+df
+```
