@@ -87,7 +87,8 @@ Linear Regression RMSE: 6.311982
 Stepwise Backward RMSE: 6.311982
 Stepwise Forward RMSE: 6.311982
 Stepwise Both RMSE: 6.311982
-KNN
+
+KNN Model
 From the variables chosen by the on the regression method, I will create a K Nearest Neighbors model using the variables with the highest correlation and display the accuracy
 
 Although from part one, all Stepwise models output the same RMSE, used Stepwise Forward as it contains the least amount of variables.
@@ -96,10 +97,7 @@ Stepwise Forward
 
 Variables Selected:CTR ~ Clicks + Impressions + Position + Conversions 
 
-Correlation Matrix
-From the Correlation Check, I'm choosing Clicks and Conversions since they are highly and positively correlated
+Accurracies Matrix
 
-
-
-KNN Model
+We created an accurracy table for all variables. The most accurrate variable combination is 0.78.
 
